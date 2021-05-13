@@ -155,8 +155,8 @@ uint8_t last_process = Main;
 uint8_t popup;
 uint8_t last_popup;
 
-void (*funcpointer)();
-void *valuepointer;
+void (*funcpointer)() = nullptr;
+void *valuepointer = nullptr;
 float tempvalue;
 float valuemin;
 float valuemax;
