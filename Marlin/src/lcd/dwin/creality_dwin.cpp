@@ -152,8 +152,8 @@ uint8_t last_selection = 0;
 uint8_t scrollpos = 0;
 uint8_t process = Main;
 uint8_t last_process = Main;
-uint8_t popup;
-uint8_t last_popup;
+PopupID popup;
+PopupID last_popup;
 
 void (*funcpointer)() = nullptr;
 void *valuepointer = nullptr;
@@ -4360,7 +4360,7 @@ uint8_t CrealityDWINClass::Get_Menu_Size(uint8_t menu) {
 
 /* Popup Config */
 
-void CrealityDWINClass::Popup_Handler(uint8_t popupid, bool option/*=false*/) {
+void CrealityDWINClass::Popup_Handler(PopupID popupid, bool option/*=false*/) {
   popup = last_popup = popupid;
   switch (popupid) {
     case Pause:
@@ -4414,10 +4414,12 @@ void CrealityDWINClass::Popup_Handler(uint8_t popupid, bool option/*=false*/) {
     case Resuming:
       Draw_Popup("Resuming Print", "Please wait until done.", "", Wait, ICON_BLTouch);
       break;
+    default:
+      break;
   }
 }
 
-void CrealityDWINClass::Confirm_Handler(uint8_t popupid) {
+void CrealityDWINClass::Confirm_Handler(PopupID popupid) {
   popup = popupid;
   switch (popupid) {
     case FilInsert:
@@ -4434,6 +4436,8 @@ void CrealityDWINClass::Confirm_Handler(uint8_t popupid) {
       break;
     case InvalidMesh:
       Draw_Popup("Valid mesh must exist", "before tuning can be", "performed", Confirm);
+      break;
+    default:
       break;
   }
 }
@@ -4880,6 +4884,8 @@ void CrealityDWINClass::Popup_Control() {
           Draw_Menu(Leveling, LEVELING_GET_MESH);
           break;
       #endif
+        default:
+          break;
     }
   DWIN_UpdateLCD();
 }

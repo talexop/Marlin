@@ -35,7 +35,7 @@ enum processID : uint8_t {
   Main, Print, Menu, Value, Option, File, Popup, Confirm, Wait
 };
 
-enum popupID : uint8_t {
+enum PopupID : uint8_t {
   Pause, Stop, Resume, SaveLevel, ETemp, ConfFilChange, PurgeMore,
   Level, Home, MoveWait, Heating,  FilLoad, FilChange, TempWarn, Runout, PIDWait, Resuming,
   FilInsert, HeaterTime, UserInput, LevelError, InvalidMesh, UI, Complete
@@ -327,8 +327,8 @@ public:
   void Menu_Item_Handler(uint8_t menu, uint8_t item, bool draw=true);
 
 
-  void Popup_Handler(uint8_t popupid, bool option = false);
-  void Confirm_Handler(uint8_t popupid);
+  void Popup_Handler(PopupID popupid, bool option = false);
+  void Confirm_Handler(PopupID popupid);
 
 
   void Main_Menu_Control();
