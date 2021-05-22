@@ -173,7 +173,8 @@ int16_t pausetemp, pausebed, pausefan;
 
 bool livemove = false;
 bool liveadjust = false;
-bool bedonly = false;
+bool preheatbed = true;
+bool preheathotend = true;
 float zoffsetvalue = 0;
 uint8_t gridpoint;
 
@@ -879,6 +880,12 @@ void CrealityDWINClass::Draw_Status_Area(bool icons/*=false*/) {
   static float x = -1;
   static float y = -1;
   static float z = -1;
+  static bool update_x = false;
+  static bool update_y = false;
+  static bool update_z = false;
+  update_x = (current_position.x != x || axis_should_home(X_AXIS) || update_x);
+  update_y = (current_position.y != y || axis_should_home(Y_AXIS) || update_y);
+  update_z = (current_position.z != z || axis_should_home(Z_AXIS) || update_z);
   if (icons) {
     x = -1;
     y = -1;
@@ -888,16 +895,26 @@ void CrealityDWINClass::Draw_Status_Area(bool icons/*=false*/) {
     DWIN_ICON_Show(ICON, ICON_MaxSpeedY,   95, 456);
     DWIN_ICON_Show(ICON, ICON_MaxSpeedZ,   180, 456);
   }
-  if (current_position.x != x) {
+  if (update_x) {
     x = current_position.x;
-    DWIN_Draw_FloatValue(true, true, 0, DWIN_FONT_MENU, GetColor(eeprom_settings.coordinates_text, Color_White), Color_Bg_Black, 3, 1, 35, 459, current_position.x * 10);
+    if ((update_x = axis_should_home(X_AXIS) && ui.get_blink()))
+      DWIN_Draw_String(false, true, DWIN_FONT_MENU, GetColor(eeprom_settings.coordinates_text, Color_White), Color_Bg_Black, 35, 459, "  -?-  ");
+    else
+      DWIN_Draw_FloatValue(true, true, 0, DWIN_FONT_MENU, GetColor(eeprom_settings.coordinates_text, Color_White), Color_Bg_Black, 3, 1, 35, 459, current_position.x * 10);
   }
-  if (current_position.y != y) {
+  if (update_y) {
     y = current_position.y;
-    DWIN_Draw_FloatValue(true, true, 0, DWIN_FONT_MENU, GetColor(eeprom_settings.coordinates_text, Color_White), Color_Bg_Black, 3, 1, 120, 459, current_position.y * 10);
+    if ((update_y = axis_should_home(Y_AXIS) && ui.get_blink()))
+      DWIN_Draw_String(false, true, DWIN_FONT_MENU, GetColor(eeprom_settings.coordinates_text, Color_White), Color_Bg_Black, 120, 459, "  -?-  ");
+    else
+      DWIN_Draw_FloatValue(true, true, 0, DWIN_FONT_MENU, GetColor(eeprom_settings.coordinates_text, Color_White), Color_Bg_Black, 3, 1, 120, 459, current_position.y * 10);
   }
-  if (current_position.z != z) {
-    DWIN_Draw_FloatValue(true, true, 0, DWIN_FONT_MENU, GetColor(eeprom_settings.coordinates_text, Color_White), Color_Bg_Black, 3, 2, 205, 459, (current_position.z>=0) ? current_position.z * 100 : 0);
+  if (update_z) {
+    z = current_position.z;
+    if ((update_z = axis_should_home(Z_AXIS) && ui.get_blink()))
+      DWIN_Draw_String(false, true, DWIN_FONT_MENU, GetColor(eeprom_settings.coordinates_text, Color_White), Color_Bg_Black, 205, 459, "  -?-  ");
+        else
+      DWIN_Draw_FloatValue(true, true, 0, DWIN_FONT_MENU, GetColor(eeprom_settings.coordinates_text, Color_White), Color_Bg_Black, 3, 2, 205, 459, (current_position.z>=0) ? current_position.z * 100 : 0);
   }
   DWIN_UpdateLCD();
 }
@@ -1536,8 +1553,9 @@ void CrealityDWINClass::Menu_Item_Handler(uint8_t menu, uint8_t item, bool draw/
       case Preheat:
 
         #define PREHEAT_BACK 0
-        #define PREHEAT_MODE (PREHEAT_BACK + 1)
-        #define PREHEAT_1 (PREHEAT_MODE + (PREHEAT_COUNT >= 1))
+        #define PREHEAT_HOTEND (PREHEAT_BACK + HAS_HOTEND)
+        #define PREHEAT_BED (PREHEAT_HOTEND + HAS_HEATED_BED)
+        #define PREHEAT_1 (PREHEAT_BED + (PREHEAT_COUNT >= 1))
         #define PREHEAT_2 (PREHEAT_1 + (PREHEAT_COUNT >= 2))
         #define PREHEAT_3 (PREHEAT_2 + (PREHEAT_COUNT >= 3))
         #define PREHEAT_4 (PREHEAT_3 + (PREHEAT_COUNT >= 4))
@@ -1553,14 +1571,24 @@ void CrealityDWINClass::Menu_Item_Handler(uint8_t menu, uint8_t item, bool draw/
               Draw_Menu(Prepare, PREPARE_PREHEAT);
             }
             break;
-          case PREHEAT_MODE:
+          case PREHEAT_HOTEND:
             if (draw) {
-              Draw_Menu_Item(row, ICON_Homing, "Bed Only Mode");
-              Draw_Checkbox(row, bedonly);
+              Draw_Menu_Item(row, ICON_Homing, (char*)"Hotend");
+              Draw_Checkbox(row, preheathotend);
             }
             else {
-              bedonly = !bedonly;
-              Draw_Checkbox(row, bedonly);
+              preheathotend = !preheathotend;
+              Draw_Checkbox(row, preheathotend);
+            }
+            break;
+          case PREHEAT_BED:
+            if (draw) {
+              Draw_Menu_Item(row, ICON_Homing, (char*)"Bed");
+              Draw_Checkbox(row, preheatbed);
+            }
+            else {
+              preheatbed = !preheatbed;
+              Draw_Checkbox(row, preheatbed);
             }
             break;
           #if (PREHEAT_COUNT >= 1)
@@ -1569,11 +1597,11 @@ void CrealityDWINClass::Menu_Item_Handler(uint8_t menu, uint8_t item, bool draw/
                 Draw_Menu_Item(row, ICON_Temperature, PREHEAT_1_LABEL);
               }
               else {
-                if (!bedonly) {
+                if (preheathotend) {
                   thermalManager.setTargetHotend(ui.material_preset[0].hotend_temp, 0);
                   thermalManager.set_fan_speed(0, ui.material_preset[0].fan_speed);
                 }
-                thermalManager.setTargetBed(ui.material_preset[0].bed_temp);
+                if (preheatbed) thermalManager.setTargetBed(ui.material_preset[0].bed_temp);
               }
               break;
           #endif
@@ -1583,11 +1611,11 @@ void CrealityDWINClass::Menu_Item_Handler(uint8_t menu, uint8_t item, bool draw/
                 Draw_Menu_Item(row, ICON_Temperature, PREHEAT_2_LABEL);
               }
               else {
-                if (!bedonly) {
+                if (preheathotend) {
                   thermalManager.setTargetHotend(ui.material_preset[1].hotend_temp, 0);
                   thermalManager.set_fan_speed(0, ui.material_preset[1].fan_speed);
                 }
-                thermalManager.setTargetBed(ui.material_preset[1].bed_temp);
+                if (preheatbed) thermalManager.setTargetBed(ui.material_preset[1].bed_temp);
               }
               break;
           #endif
@@ -1597,11 +1625,11 @@ void CrealityDWINClass::Menu_Item_Handler(uint8_t menu, uint8_t item, bool draw/
                 Draw_Menu_Item(row, ICON_Temperature, PREHEAT_3_LABEL);
               }
               else {
-                if (!bedonly) {
+                if (preheathotend) {
                   thermalManager.setTargetHotend(ui.material_preset[2].hotend_temp, 0);
                   thermalManager.set_fan_speed(0, ui.material_preset[2].fan_speed);
                 }
-                thermalManager.setTargetBed(ui.material_preset[2].bed_temp);
+                if (preheatbed) thermalManager.setTargetBed(ui.material_preset[2].bed_temp);
               }
               break;
           #endif
@@ -1611,11 +1639,11 @@ void CrealityDWINClass::Menu_Item_Handler(uint8_t menu, uint8_t item, bool draw/
                 Draw_Menu_Item(row, ICON_Temperature, PREHEAT_4_LABEL);
               }
               else {
-                if (!bedonly) {
+                if (preheathotend) {
                   thermalManager.setTargetHotend(ui.material_preset[3].hotend_temp, 0);
                   thermalManager.set_fan_speed(0, ui.material_preset[3].fan_speed);
                 }
-                thermalManager.setTargetBed(ui.material_preset[3].bed_temp);
+                if (preheatbed) thermalManager.setTargetBed(ui.material_preset[3].bed_temp);
               }
               break;
           #endif
@@ -1625,11 +1653,11 @@ void CrealityDWINClass::Menu_Item_Handler(uint8_t menu, uint8_t item, bool draw/
                 Draw_Menu_Item(row, ICON_Temperature, PREHEAT_5_LABEL);
               }
               else {
-                if (!bedonly) {
+                if (preheathotend) {
                   thermalManager.setTargetHotend(ui.material_preset[4].hotend_temp, 0);
                   thermalManager.set_fan_speed(0, ui.material_preset[4].fan_speed);
                 }
-                thermalManager.setTargetBed(ui.material_preset[4].bed_temp);
+                if (preheatbed) thermalManager.setTargetBed(ui.material_preset[4].bed_temp);
               }
               break;
           #endif
@@ -3824,7 +3852,7 @@ void CrealityDWINClass::Menu_Item_Handler(uint8_t menu, uint8_t item, bool draw/
               mesh_x = GRID_MAX_POINTS_X - mesh_x - 1;
             }
 
-            const float currval = mesh_z_values[mesh_x][mesh_y];
+            const float currval = mesh_conf.mesh_z_values[mesh_x][mesh_y];
 
             if (draw) {
               Draw_Menu_Item(row, ICON_Zoffset, "Goto Mesh Value");
@@ -3998,14 +4026,14 @@ void CrealityDWINClass::Menu_Item_Handler(uint8_t menu, uint8_t item, bool draw/
     case PreheatHotend:
 
         #define PREHEATHOTEND_BACK 0
-        #define PREHEATHOTEND_1 (PREHEATHOTEND_BACK + (PREHEAT_COUNT >= 1))
+        #define PREHEATHOTEND_CONTINUE (PREHEATHOTEND_BACK + 1)
+        #define PREHEATHOTEND_1 (PREHEATHOTEND_CONTINUE + (PREHEAT_COUNT >= 1))
         #define PREHEATHOTEND_2 (PREHEATHOTEND_1 + (PREHEAT_COUNT >= 2))
         #define PREHEATHOTEND_3 (PREHEATHOTEND_2 + (PREHEAT_COUNT >= 3))
         #define PREHEATHOTEND_4 (PREHEATHOTEND_3 + (PREHEAT_COUNT >= 4))
         #define PREHEATHOTEND_5 (PREHEATHOTEND_4 + (PREHEAT_COUNT >= 5))
         #define PREHEATHOTEND_CUSTOM (PREHEATHOTEND_5 + 1)
-        #define PREHEATHOTEND_CONTINUE (PREHEATHOTEND_CUSTOM + 1)
-        #define PREHEATHOTEND_TOTAL PREHEATHOTEND_CONTINUE
+        #define PREHEATHOTEND_TOTAL PREHEATHOTEND_CUSTOM
 
         switch (item) {
           case PREHEATHOTEND_BACK:
@@ -4016,6 +4044,47 @@ void CrealityDWINClass::Menu_Item_Handler(uint8_t menu, uint8_t item, bool draw/
               thermalManager.setTargetHotend(0, 0);
               thermalManager.set_fan_speed(0, 0);
               Redraw_Menu(false, true, true);
+            }
+            break;
+          case PREHEATHOTEND_CONTINUE:
+            if (draw) {
+              Draw_Menu_Item(row, ICON_SetEndTemp, (char*)"Continue");
+            }
+            else {
+              Popup_Handler(Heating);
+              thermalManager.wait_for_hotend(0);
+              switch (last_menu) {
+                case Prepare:
+                  Popup_Handler(FilChange);
+                  char buf[20];
+                  sprintf(buf, "M600 B1 R%i", thermalManager.temp_hotend[0].target);
+                  gcode.process_subcommands_now_P(buf);
+                  break;
+                #if ENABLED(FILAMENT_LOAD_UNLOAD_GCODES)
+                  case ChangeFilament:
+                    switch (last_selection) {
+                      case CHANGEFIL_LOAD:
+                        Popup_Handler(FilLoad);
+                        gcode.process_subcommands_now_P("M701");
+                        planner.synchronize();
+                        Redraw_Menu(true, true, true);
+                        break;
+                      case CHANGEFIL_UNLOAD:
+                        Popup_Handler(FilLoad, true);
+                        gcode.process_subcommands_now_P("M702");
+                        planner.synchronize();
+                        Redraw_Menu(true, true, true);
+                        break;
+                      case CHANGEFIL_CHANGE:
+                        Popup_Handler(FilChange);
+                        char buf[20];
+                        sprintf(buf, "M600 B1 R%i", thermalManager.temp_hotend[0].target);
+                        gcode.process_subcommands_now_P(buf);
+                        break;
+                    }
+                    break;
+                #endif
+              }
             }
             break;
           #if (PREHEAT_COUNT >= 1)
@@ -4080,47 +4149,6 @@ void CrealityDWINClass::Menu_Item_Handler(uint8_t menu, uint8_t item, bool draw/
             }
             else {
               Modify_Value(thermalManager.temp_hotend[0].target, EXTRUDE_MINTEMP, MAX_E_TEMP, 1);
-            }
-            break;
-          case PREHEATHOTEND_CONTINUE:
-            if (draw) {
-              Draw_Menu_Item(row, ICON_SetEndTemp, "Continue");
-            }
-            else {
-              Popup_Handler(Heating);
-              thermalManager.wait_for_hotend(0);
-              switch (last_menu) {
-                case Prepare:
-                  Popup_Handler(FilChange);
-                  char buf[20];
-                  sprintf(buf, "M600 B1 R%i", thermalManager.temp_hotend[0].target);
-                  gcode.process_subcommands_now_P(buf);
-                  break;
-                #if ENABLED(FILAMENT_LOAD_UNLOAD_GCODES)
-                  case ChangeFilament:
-                    switch (last_selection) {
-                      case CHANGEFIL_LOAD:
-                        Popup_Handler(FilLoad);
-                        gcode.process_subcommands_now_P("M701");
-                        planner.synchronize();
-                        Redraw_Menu(true, true, true);
-                        break;
-                      case CHANGEFIL_UNLOAD:
-                        Popup_Handler(FilLoad, true);
-                        gcode.process_subcommands_now_P("M702");
-                        planner.synchronize();
-                        Redraw_Menu(true, true, true);
-                        break;
-                      case CHANGEFIL_CHANGE:
-                        Popup_Handler(FilChange);
-                        char buf[20];
-                        sprintf(buf, "M600 B1 R%i", thermalManager.temp_hotend[0].target);
-                        gcode.process_subcommands_now_P(buf);
-                        break;
-                    }
-                    break;
-                #endif
-              }
             }
             break;
         }
@@ -4867,6 +4895,7 @@ void CrealityDWINClass::Popup_Control() {
           } else {
             pause_menu_response = PAUSE_RESPONSE_RESUME_PRINT;
             if (printing) Popup_Handler(Resuming);
+            else Redraw_Menu(true, true, (active_menu==PreheatHotend));
           }
           break;
       #endif
@@ -5049,7 +5078,6 @@ void CrealityDWINClass::State_Update() {
   if ((print_job_timer.isRunning() || print_job_timer.isPaused()) != printing) {
     if (!printing) Start_Print(card.isFileOpen());
     else Stop_Print();
-    delay(500);
   }
   if (print_job_timer.isPaused() != paused) {
     paused = print_job_timer.isPaused();
